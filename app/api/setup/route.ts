@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { ensureTable, getGames } from "@/lib/storage";
+import { ensureTable } from "@/lib/storage";
 
-export async function GET() {
+export async function POST() {
   try {
     await ensureTable();
-    const games = await getGames();
-    return NextResponse.json(games);
+    return NextResponse.json({ success: true, message: "Table created" });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 500 });

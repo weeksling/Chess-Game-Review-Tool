@@ -1,4 +1,4 @@
-import { getGames } from "@/lib/storage";
+import { getGameByLichessId } from "@/lib/storage";
 import { AnalysisBoard } from "@/components/AnalysisBoard";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -31,8 +31,7 @@ export default async function ReviewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const games = await getGames();
-  const game = games.find((g) => g.lichessId === id);
+  const game = await getGameByLichessId(id);
 
   if (!game) {
     notFound();
