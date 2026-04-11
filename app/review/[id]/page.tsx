@@ -1,7 +1,10 @@
-import { getGames } from "@/lib/storage";
+"use client";
+
+import { use, useEffect, useState } from "react";
+import { getGameById } from "@/lib/storage";
 import { AnalysisBoard } from "@/components/AnalysisBoard";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import type { ReviewedGame } from "@/types";
 
 function resultLabel(result: string): string {
   switch (result) {
@@ -25,17 +28,37 @@ function resultLabel(result: string): string {
   }
 }
 
-export default async function ReviewPage({
+export default function ReviewPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  const games = await getGames();
-  const game = games.find((g) => g.lichessId === id);
+  const { id } = use(params);
+  const [game, setGame] = useState<ReviewedGame | null | undefined>(undefined);
 
-  if (!game) {
-    notFound();
+  useEffect(() => {
+    setGame(getGameById(id) ?? null);
+  }, [id]);
+
+  if (game === undefined) {
+    return <p className="text-gray-500">Loading...</p>;
+  }
+
+  if (game === null) {
+    return (
+      <div>
+        <Link
+          href="/"
+          className="text-sm text-gray-400 hover:text-gray-200 mb-6 inline-block"
+        >
+          &larr; Back to games
+        </Link>
+        <p className="text-gray-500">
+          Game not found in your local library. It may have been synced on a
+          different browser.
+        </p>
+      </div>
+    );
   }
 
   const date = new Date(game.endTime * 1000);
@@ -88,7 +111,9 @@ export default async function ReviewPage({
               <div className="text-gray-500 text-xs uppercase tracking-wide">
                 Time Control
               </div>
-              <div className="capitalize">{game.timeClass} ({game.timeControl})</div>
+              <div className="capitalize">
+                {game.timeClass} ({game.timeControl})
+              </div>
             </div>
 
             <div>

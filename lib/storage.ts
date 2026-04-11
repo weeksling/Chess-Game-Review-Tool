@@ -1,35 +1,59 @@
-import { readFile, writeFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
-import path from "path";
 import type { ReviewedGame } from "@/types";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const GAMES_FILE = path.join(DATA_DIR, "games.json");
+// Client-side localStorage-backed storage for username and synced games.
+// Vercel serverless functions have a read-only filesystem, so the previous
+// file-based storage could not persist anything in production. Keeping
+// everything in the browser also removes the need for a backend user model.
 
-async function ensureDataDir() {
-  if (!existsSync(DATA_DIR)) {
-    await mkdir(DATA_DIR, { recursive: true });
+const USERNAME_KEY = "chess-review:username";
+const GAMES_KEY = "chess-review:games";
+
+function isBrowser(): boolean {
+  return typeof window !== "undefined";
+}
+
+export function getUsername(): string | null {
+  if (!isBrowser()) return null;
+  return localStorage.getItem(USERNAME_KEY);
+}
+
+export function setUsername(username: string): void {
+  if (!isBrowser()) return;
+  localStorage.setItem(USERNAME_KEY, username);
+}
+
+export function clearUsername(): void {
+  if (!isBrowser()) return;
+  localStorage.removeItem(USERNAME_KEY);
+}
+
+export function getGames(): ReviewedGame[] {
+  if (!isBrowser()) return [];
+  const raw = localStorage.getItem(GAMES_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as ReviewedGame[];
+  } catch {
+    return [];
   }
-  if (!existsSync(GAMES_FILE)) {
-    await writeFile(GAMES_FILE, "[]", "utf-8");
-  }
 }
 
-export async function getGames(): Promise<ReviewedGame[]> {
-  await ensureDataDir();
-  const raw = await readFile(GAMES_FILE, "utf-8");
-  return JSON.parse(raw) as ReviewedGame[];
+export function saveGames(games: ReviewedGame[]): void {
+  if (!isBrowser()) return;
+  const sorted = [...games].sort((a, b) => b.endTime - a.endTime);
+  localStorage.setItem(GAMES_KEY, JSON.stringify(sorted));
 }
 
-export async function saveGame(game: ReviewedGame): Promise<void> {
-  const games = await getGames();
-  games.push(game);
-  // Keep sorted by endTime descending (most recent first)
-  games.sort((a, b) => b.endTime - a.endTime);
-  await writeFile(GAMES_FILE, JSON.stringify(games, null, 2), "utf-8");
+export function mergeGames(
+  existing: ReviewedGame[],
+  incoming: ReviewedGame[]
+): ReviewedGame[] {
+  const byUuid = new Map<string, ReviewedGame>();
+  for (const g of existing) byUuid.set(g.chessComUuid, g);
+  for (const g of incoming) byUuid.set(g.chessComUuid, g);
+  return Array.from(byUuid.values()).sort((a, b) => b.endTime - a.endTime);
 }
 
-export async function hasGame(chessComUuid: string): Promise<boolean> {
-  const games = await getGames();
-  return games.some((g) => g.chessComUuid === chessComUuid);
+export function getGameById(id: string): ReviewedGame | undefined {
+  return getGames().find((g) => g.lichessId === id);
 }

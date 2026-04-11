@@ -1,31 +1,47 @@
 import { NextResponse } from "next/server";
 import { getRecentGames } from "@/lib/chess-com";
 import { importGame } from "@/lib/lichess";
-import { hasGame, saveGame } from "@/lib/storage";
 import type { ReviewedGame } from "@/types";
 
-export async function POST() {
-  const username = process.env.CHESS_COM_USERNAME;
+interface SyncRequest {
+  username?: string;
+  existingUuids?: string[];
+}
+
+export async function POST(req: Request) {
+  let body: SyncRequest;
+  try {
+    body = (await req.json()) as SyncRequest;
+  } catch {
+    body = {};
+  }
+
+  const username = body.username?.trim();
   if (!username) {
     return NextResponse.json(
-      { error: "CHESS_COM_USERNAME not configured" },
-      { status: 500 }
+      { error: "username is required" },
+      { status: 400 }
     );
   }
+
+  const existingUuids = new Set(body.existingUuids ?? []);
 
   try {
     const recentGames = await getRecentGames(username, 10);
     const synced: ReviewedGame[] = [];
     const errors: string[] = [];
+    let skipped = 0;
 
     for (const game of recentGames) {
-      // Skip already-synced games
-      if (await hasGame(game.uuid)) continue;
+      if (existingUuids.has(game.uuid)) {
+        skipped++;
+        continue;
+      }
 
       try {
         const result = await importGame(game.pgn);
 
-        const reviewed: ReviewedGame = {
+        synced.push({
           chessComUrl: game.url,
           chessComUuid: game.uuid,
           lichessId: result.id,
@@ -46,10 +62,7 @@ export async function POST() {
             result: game.black.result,
           },
           syncedAt: Date.now(),
-        };
-
-        await saveGame(reviewed);
-        synced.push(reviewed);
+        });
 
         // Small delay to respect Lichess rate limits
         await new Promise((r) => setTimeout(r, 500));
@@ -61,7 +74,7 @@ export async function POST() {
 
     return NextResponse.json({
       synced: synced.length,
-      skipped: recentGames.length - synced.length - errors.length,
+      skipped,
       errors,
       games: synced,
     });
