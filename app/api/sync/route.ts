@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRecentGames } from "@/lib/chess-com";
 import { importGame } from "@/lib/lichess";
-import { hasGame, saveGame } from "@/lib/storage";
+import { ensureTable, hasGame, saveGame } from "@/lib/storage";
 import type { ReviewedGame } from "@/types";
 
 export async function POST() {
@@ -14,6 +14,7 @@ export async function POST() {
   }
 
   try {
+    await ensureTable();
     const recentGames = await getRecentGames(username, 10);
     const synced: ReviewedGame[] = [];
     const errors: string[] = [];

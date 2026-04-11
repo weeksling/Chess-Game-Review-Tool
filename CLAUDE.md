@@ -8,8 +8,10 @@ A web app that lets users import chess games from Chess.com (or paste PGN direct
 
 - **Framework:** Next.js (App Router) with TypeScript
 - **Language:** TypeScript throughout (strict mode)
-- **Styling:** TBD (default to Tailwind CSS unless otherwise specified)
-- **Package manager:** npm (default) — update this if changed
+- **Styling:** Tailwind CSS v4
+- **Database:** Neon Postgres (via `@neondatabase/serverless`)
+- **Hosting:** Vercel
+- **Package manager:** npm
 
 ## Core User Flow
 
@@ -51,7 +53,8 @@ A web app that lets users import chess games from Chess.com (or paste PGN direct
 │   └── review/[id]/      # Analysis board page
 ├── lib/
 │   ├── chess-com.ts      # Chess.com API client
-│   └── lichess.ts        # Lichess gameImport wrapper
+│   ├── lichess.ts        # Lichess gameImport wrapper
+│   └── storage.ts        # Neon Postgres storage layer
 ├── components/
 │   └── AnalysisBoard.tsx # Iframe embed or link component
 ├── postman/
@@ -72,10 +75,20 @@ npm run type-check # tsc --noEmit
 ## Environment Variables
 
 ```
+DATABASE_URL=        # Neon Postgres connection string (required)
+CHESS_COM_USERNAME=  # Chess.com username to fetch games for
+NEXT_PUBLIC_CHESS_COM_USERNAME= # Same username, exposed to client UI
 LICHESS_API_TOKEN=   # OAuth token for Lichess game import (optional for anon use)
 ```
 
-Store in `.env.local` (never commit).
+Store in `.env.local` (never commit). On Vercel, set these in Settings > Environment Variables.
+
+## Deployment (Vercel)
+
+1. Connect repo to Vercel
+2. Add a Neon Postgres database via Vercel Marketplace (auto-sets `DATABASE_URL`)
+3. Set remaining env vars (`CHESS_COM_USERNAME`, `NEXT_PUBLIC_CHESS_COM_USERNAME`, optionally `LICHESS_API_TOKEN`)
+4. Deploy — the database table is auto-created on first sync
 
 ## Coding Conventions
 
