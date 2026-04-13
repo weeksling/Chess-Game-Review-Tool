@@ -1,16 +1,5 @@
 import { initialize, gameImport } from "equine";
 
-let initialized = false;
-
-function ensureInitialized() {
-  if (initialized) return;
-  const token = process.env.LICHESS_API_TOKEN;
-  if (token) {
-    initialize(token);
-  }
-  initialized = true;
-}
-
 export interface ImportResult {
   id: string;
   url: string;
@@ -18,7 +7,10 @@ export interface ImportResult {
 }
 
 export async function importGame(pgn: string): Promise<ImportResult> {
-  ensureInitialized();
+  const token = process.env.LICHESS_API_TOKEN;
+  if (token) {
+    initialize(token);
+  }
 
   const response = await gameImport({ body: { pgn } });
 

@@ -2,36 +2,50 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { GameCard } from "@/components/GameCard";
+import { SettingsPanel } from "@/components/SettingsPanel";
+import { useSettings } from "@/lib/hooks/use-settings";
 import type { ReviewedGame } from "@/types";
 
-const USERNAME = process.env.NEXT_PUBLIC_CHESS_COM_USERNAME ?? "anewmatt";
-
 export default function HomePage() {
+  const { settings, loaded, updateSettings } = useSettings();
   const [games, setGames] = useState<ReviewedGame[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const username = settings.chessComUsername;
 
   const loadGames = useCallback(async () => {
+    if (!username) {
+      setGames([]);
+      setLoading(false);
+      return;
+    }
     try {
-      const res = await fetch("/api/games");
+      const res = await fetch(`/api/games?username=${encodeURIComponent(username)}`);
       if (res.ok) {
         setGames(await res.json());
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [username]);
 
   useEffect(() => {
-    loadGames();
-  }, [loadGames]);
+    if (loaded) loadGames();
+  }, [loaded, loadGames]);
 
   async function handleSync() {
+    if (!username) return;
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch("/api/sync", { method: "POST" });
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+      });
       const data = await res.json();
       if (!res.ok) {
         setSyncResult(`Error: ${data.error}`);
@@ -50,6 +64,30 @@ export default function HomePage() {
     }
   }
 
+  // Show loading state while settings hydrate from localStorage
+  if (!loaded) return null;
+
+  // Show settings if no username configured or user opened settings
+  if (!username || showSettings) {
+    return (
+      <div className="max-w-md mx-auto mt-8">
+        {!username && (
+          <p className="text-gray-400 text-sm mb-4">
+            Set your Chess.com username to get started.
+          </p>
+        )}
+        <SettingsPanel
+          settings={settings}
+          onSave={(updates) => {
+            updateSettings(updates);
+            setShowSettings(false);
+          }}
+          onClose={username ? () => setShowSettings(false) : undefined}
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Header section */}
@@ -59,22 +97,30 @@ export default function HomePage() {
           <p className="text-sm text-gray-400 mt-1">
             Games for{" "}
             <a
-              href={`https://www.chess.com/member/${USERNAME}`}
+              href={`https://www.chess.com/member/${username}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-400 hover:underline"
             >
-              {USERNAME}
+              {username}
             </a>
           </p>
         </div>
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-400 text-sm font-medium transition-colors"
-        >
-          {syncing ? "Syncing..." : "Sync Now"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="px-3 py-2 rounded-lg border border-gray-700 hover:border-gray-500 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            Settings
+          </button>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-400 text-sm font-medium transition-colors"
+          >
+            {syncing ? "Syncing..." : "Sync Now"}
+          </button>
+        </div>
       </div>
 
       {/* Sync status */}
@@ -103,7 +149,7 @@ export default function HomePage() {
       ) : (
         <div className="grid gap-3">
           {games.map((game) => (
-            <GameCard key={game.lichessId} game={game} username={USERNAME} />
+            <GameCard key={game.lichessId} game={game} username={username} />
           ))}
         </div>
       )}

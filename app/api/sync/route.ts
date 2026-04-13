@@ -1,15 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getRecentGames } from "@/lib/chess-com";
 import { importGame } from "@/lib/lichess";
 import { hasGame, saveGame } from "@/lib/storage";
 import type { ReviewedGame } from "@/types";
 
-export async function POST() {
-  const username = process.env.CHESS_COM_USERNAME;
-  if (!username) {
+export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => ({}));
+  const username = body.username;
+
+  if (!username || typeof username !== "string") {
     return NextResponse.json(
-      { error: "CHESS_COM_USERNAME not configured" },
-      { status: 500 }
+      { error: "username is required in request body" },
+      { status: 400 }
     );
   }
 
@@ -19,7 +21,6 @@ export async function POST() {
     const errors: string[] = [];
 
     for (const game of recentGames) {
-      // Skip already-synced games
       if (await hasGame(game.uuid)) continue;
 
       try {
@@ -48,7 +49,7 @@ export async function POST() {
           syncedAt: Date.now(),
         };
 
-        await saveGame(reviewed);
+        await saveGame(username, reviewed);
         synced.push(reviewed);
 
         // Small delay to respect Lichess rate limits
